@@ -1,0 +1,9 @@
+<script setup>
+import { reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { login, register } from '../api'
+const props = defineProps({ initialMode: { type: String, default: 'login' } }); const router = useRouter(); const mode = ref(props.initialMode); const loading = ref(false); const message = ref(''); const form = reactive({ username: '', password: '' })
+watch(() => props.initialMode, value => { mode.value = value; message.value = '' })
+async function submit() { loading.value = true; message.value = ''; try { const user = mode.value === 'login' ? await login(form) : await register(form); localStorage.setItem('microworld-user', JSON.stringify(user)); localStorage.setItem('microworld-token', user.accessToken); await router.push('/') } catch (error) { message.value = error.message } finally { loading.value = false } }
+</script>
+<template><main class="auth-page"><nav class="nav container"><RouterLink class="brand" to="/"><span>✦</span> Your Microworld</RouterLink></nav><section class="auth-shell"><section class="auth-card"><div class="tabs"><RouterLink :class="{ active: mode === 'login' }" to="/login">登录</RouterLink><RouterLink :class="{ active: mode === 'register' }" to="/register">注册</RouterLink></div><h2>{{ mode === 'login' ? '继续你的故事' : '创建创作者账户' }}</h2><p>用户名为 3–32 位；密码为 6–72 位。</p><form @submit.prevent="submit"><label>用户名<input v-model.trim="form.username" minlength="3" maxlength="32" required autocomplete="username" placeholder="writer_01" /></label><label>密码<input v-model="form.password" type="password" minlength="6" maxlength="72" required autocomplete="current-password" placeholder="至少 6 位" /></label><button class="primary" :disabled="loading">{{ loading ? '处理中…' : mode === 'login' ? '进入微世界' : '创建账户' }}</button></form><p v-if="message" class="form-message">{{ message }}</p></section></section></main></template>

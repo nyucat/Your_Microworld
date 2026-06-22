@@ -1,0 +1,14 @@
+# 仅用于没有安装 MySQL 时的临时本地演示：--spring.profiles.active=h2
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/microworld;MODE=MySQL;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      enabled: true
+      path: /h2-console

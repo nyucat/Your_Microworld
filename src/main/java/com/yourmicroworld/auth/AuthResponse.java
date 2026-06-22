@@ -1,0 +1,3 @@
+package com.yourmicroworld.auth;
+
+public record AuthResponse(Long userId, String username, String role, String accessToken) { }
