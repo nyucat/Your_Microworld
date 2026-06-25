@@ -1,59 +1,122 @@
 # Your Microworld
 
-一个让故事以“图结构”生长的协作叙事社区。它不只是发布和阅读小说：主线可以由社区竞标续写，任一章节可衍生不同选择的 IF 线，读者还可在段落级参与讨论。
+一个面向协作叙事的小说社区原型。当前版本已经完成 Sprint 0、Sprint 1，并在此基础上补充了前端视觉改造、阅读动效，以及“微小说 / 连载小说”双类型发布能力。
 
-## 产品概念
+## 当前可用能力
 
-一部小说由章节节点和关系边构成，而非只能线性阅读：
+- 账号注册 / 登录
+- JWT 鉴权
+- 首页、已发布页、个人主页
+- 发布小说
+  - 微小说：一次发布完成，直接展示完整正文
+  - 连载小说：发布小说并创建第一章，后续可继续追加章节
+- 小说列表 / 小说详情 / 章节阅读
+- 阅读页上一章 / 下一章固定导航
+- 阅读页底部固定进度条
 
-- **主作者**创建小说、世界观、标签和协作规则，并发布主线起点。
-- **副作者**为主线下一章提交大纲、风格与剧情影响计划；社区在限时投票后决定创作权。
-- **从作者**从某章创建 IF 线；IF 线不能竞标续写，但可继续向下分叉。
-- **读者**阅读、段落评论、投票，并在结构图中探索平行叙事。
+## 技术栈
 
-核心模型：`Novel → Chapter（MAIN / IF_BRANCH）→ ChapterRelation`。章节的 `parentId` 与关系表共同描述叙事树/图；评论绑定 `chapterId + paragraphIndex`。
+- 后端：Java 17、Spring Boot 3、Spring Data JPA、MySQL 8
+- 前端：Vue 3、Vite、Vue Router
+- 认证：JWT
 
-## 迭代计划与验收版本
+## Sprint 进度
 
-| Sprint | 范围 | 可演示成果 |
+| Sprint | 状态 | 说明 |
 | --- | --- | --- |
-| 0（已完成） | 工程基础、账户、健康检查 | 注册、登录、首页占位接口、MySQL 持久化数据库 |
-| 1（已完成） | 小说与主线章节 | 创建小说、发布首章、列表、详情、续章与阅读 |
-| 2 | 段落评论、标签 | 折叠评论、标签分类与筛选 |
-| 3 | IF 线与章节树 | 从章节分叉、浏览不同故事线 |
-| 4 | 章节竞标 | 提案、限时投票、获胜者续写主线 |
-| 5 | 图谱与热度分析 | 结构图、热门章节/角色/分支排行 |
+| Sprint 0 | 已完成 | 后端工程、MySQL 连接、统一返回结构、JWT 登录、前端初始化、路由、API 封装、登录注册、`/health` |
+| Sprint 1 | 已完成 | 小说发布、小说列表、小说详情、章节阅读、主线续写 |
+| Sprint 1 补充 | 已完成 | 个人主页、前端中文化、可爱风 UI、交互动效、固定阅读导航、阅读进度条、微小说/连载小说类型拆分 |
+| Sprint 2+ | 未开始 | 评论、标签、IF 分支、竞标、分析等后续能力 |
 
-## 当前可运行版本（Sprint 0）
+## 小说类型说明
 
-后端使用 Java 17、Spring Boot 3、Spring Data JPA 与 MySQL 8；前端位于 `frontend/`，采用 Vue 3 + Vite 与 Vue Router。注册/登录使用 BCrypt 校验密码，成功后返回 JWT；前端将令牌保存在本地并自动附加到后续 API 请求。接口统一 JSON 返回并具备参数校验。
+### 1. 微小说（`MICRO`）
 
-### Sprint 0 验收状态
+- 发布时直接提交完整正文
+- 不创建章节
+- 小说详情页直接阅读正文
+- 不允许继续追加章节
 
-| 项目 | 状态 | 说明 |
-| --- | --- | --- |
-| Spring Boot 工程与统一响应 | 已完成 | Maven 可成功打包。 |
-| MySQL 驱动与连接配置 | 已完成 | 已实测建立 JDBC 连接。 |
-| 用户注册、登录 | 已完成 | 用户名唯一、参数校验、BCrypt 密码哈希。 |
-| JWT 认证 | 已完成 | 登录/注册签发有效期 120 分钟的 JWT；`/api/auth/me` 已验证受保护访问。 |
-| Vue 初始化、路由与 API 封装 | 已完成 | `/`、`/login`、`/register` 路由；`npm run build` 已通过，开发服务器代理 `/api`。 |
-| Vue 首页与登录/注册页面 | 已完成 | 首页后端状态展示，登录/注册成功后保存 JWT。 |
-| 最终启动冒烟测试 | 已完成 | MySQL 连接、后端启动、健康检查与 JWT 链路已验证。 |
+### 2. 连载小说（`SERIAL`）
 
+- 发布时需要填写第一章标题和正文
+- 会创建主线第一章
+- 可在详情页继续发布后续章节
+- 当前仅原作者可续写主线
 
-### 运行
+## 目录结构
 
-前提：JDK 17 与 Maven 3.9+。
+```text
+Your_Microworld/
+├─ src/                       # Spring Boot 后端
+├─ frontend/                  # Vue 前端
+├─ db/mysql/                  # MySQL 脚本
+├─ config/                    # 本地配置（如 application-local.yml）
+├─ introduce.txt              # 项目原始需求说明
+└─ README.md
+```
+
+## 数据库脚本
+
+按顺序导入 `db/mysql/` 下脚本：
+
+```text
+00_create_database.sql
+01_users.sql
+02_novels_and_tags.sql
+03_chapters_and_graph.sql
+04_comments.sql
+05_bidding.sql
+06_characters.sql
+07_analytics.sql
+08_align_users_role.sql
+09_novel_types.sql
+```
+
+说明：
+
+- `08_align_users_role.sql`：对齐旧版 `users.role` 字段
+- `09_novel_types.sql`：新增小说类型字段 `type` 与微小说正文 `micro_content`
+
+如果你已经导入到 `08`，现在要支持“微小说 / 连载小说”，请务必继续导入：
+
+```text
+db/mysql/09_novel_types.sql
+```
+
+## 本地运行
+
+### 1. 启动后端
+
+确保你本地已准备：
+
+- JDK 17
+- Maven 3.9+
+- MySQL 8
+
+默认读取：
+
+- 数据库：`your_microworld`
+- 端口：`8080`
+
+数据库账号密码可放在：
+
+- `config/application-local.yml`
+
+启动命令：
 
 ```powershell
 mvn spring-boot:run
 ```
 
-按 [db/mysql/README.md](db/mysql/README.md) 中的编号顺序导入脚本：它们会创建 `your_microworld` 数据库及完整的 Sprint 0–5 表结构。默认连接 `localhost:3306/your_microworld`，本机密码位于已忽略且不会打进 JAR 的 `config/application-local.yml`；团队成员请通过 `DB_PASSWORD` 环境变量配置自己的密码。
+### 2. 启动前端
 
-如需临时不用 MySQL 的 H2 演示模式，可追加 `--spring.profiles.active=h2`；H2 控制台为 `http://localhost:8080/h2-console`。
+确保你本地已准备：
 
-另开一个终端启动前端（需 Node.js 20+）：
+- Node.js 20+
+
+启动命令：
 
 ```powershell
 cd frontend
@@ -61,61 +124,103 @@ npm install
 npm run dev
 ```
 
-浏览器访问 `http://localhost:5173`。Vite 已将 `/api` 代理到后端的 `8080` 端口。
+前端默认访问：
 
-### API
+- `http://localhost:5173`
+
+Vite 会将 `/api` 代理到后端 `8080`。
+
+## 主要接口
+
+### 基础与鉴权
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/health` | 服务健康状态 |
-| GET | `/api/home` | 首页占位内容 |
-| POST | `/api/auth/register` | 注册（用户名、密码） |
-| POST | `/api/auth/login` | 登录校验（用户名、密码） |
-| GET | `/api/auth/me` | JWT 受保护接口，返回当前用户名 |
-| GET | `/api/novels` | 公开查询小说列表，支持 `page`、`size` |
-| POST | `/api/novels` | 登录用户发布小说与第一章 |
-| GET | `/api/novels/{id}` | 公开查询小说详情与主线章节 |
-| POST | `/api/novels/{id}/chapters` | 主作者发布下一章主线 |
-| GET | `/api/chapters/{id}` | 公开阅读单章 |
+| GET | `/api/health` | 健康检查 |
+| POST | `/api/auth/register` | 注册 |
+| POST | `/api/auth/login` | 登录 |
 
-登录成功后，所有需要认证的接口须附带：
+### 小说
 
-```http
-Authorization: Bearer <accessToken>
-```
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/novels` | 小说列表 |
+| POST | `/api/novels` | 发布小说 |
+| GET | `/api/novels/{id}` | 小说详情 |
+| GET | `/api/novels/{id}/chapters` | 连载章节列表 |
+| POST | `/api/novels/{id}/chapters` | 追加主线章节 |
 
-## Sprint 1：小说发布与阅读
+### 章节与用户
 
-Sprint 1 已完成一个可运行的简化小说网站：登录用户可在“发布小说”页填写标题、简介、可选世界观/大纲，并同时发布第一章；首页展示最新小说；详情页展示主线章节列表；任意读者可进入阅读页。当前阶段仅主作者可以续写主线，协作竞标和 IF 分支将在后续 Sprint 开放。
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/chapters/{id}` | 单章阅读 |
+| GET | `/api/users/{id}` | 用户个人主页 |
 
-前端路由：
+## 发布小说请求示例
 
-| 路径 | 页面 |
-| --- | --- |
-| `/` | 小说列表首页 |
-| `/novels/create` | 发布小说与第一章（需登录） |
-| `/novels/:id` | 小说详情、章节目录、主作者续章 |
-| `/chapters/:id` | 章节阅读页 |
-
-注册请求示例：
+### 微小说
 
 ```json
 {
-  "username": "writer_01",
-  "password": "password123"
+  "title": "雨夜便利店",
+  "type": "MICRO",
+  "description": "一个发生在深夜便利店里的短篇故事",
+  "microContent": "正文内容……",
+  "worldSetting": "",
+  "outlineContent": "",
+  "allowIfBranch": false,
+  "allowBid": false,
+  "firstChapterTitle": "",
+  "firstChapterContent": ""
 }
 ```
 
-## 后续工程结构
+### 连载小说
 
-当前采用便于 MVP 快速演进的模块化单体；功能稳定后，按领域拆成 `auth`、`user`、`novel`、`chapter`、`branch`、`bid`、`comment`、`analytics` 和 `tag` 包。前端计划使用 Vue + Pinia，并以 Cytoscape.js 或 D3.js 呈现章节图。
-
-```text
-Web UI (Vue + Graph View)
-          │ REST API
-Spring Boot: auth / novel / chapter / branch / bid / comment / analytics
-          │
-MySQL（正式环境） + Redis（缓存、排行）
+```json
+{
+  "title": "星港回声",
+  "type": "SERIAL",
+  "description": "一部持续展开的科幻连载",
+  "microContent": "",
+  "worldSetting": "未来星港、失落航线、人工意识……",
+  "outlineContent": "可公开的大纲内容",
+  "allowIfBranch": true,
+  "allowBid": true,
+  "firstChapterTitle": "第一章：港口来信",
+  "firstChapterContent": "第一章正文……"
+}
 ```
 
-热度指标将在 Sprint 5 以章节为单位聚合，例如：浏览 × 1 + 评论 × 3 + 点赞 × 2 + 竞标参与 × 5；它用于作者的作品内 Top 10 热度排行和结构图节点样式。
+## 前端现状
+
+当前前端已经做过一轮可爱风重构，并加入了以下交互：
+
+- 页面切换淡入淡出
+- 首页翻书动画
+- 发布页写字笔动画
+- 登录 / 注册成功提示动画
+- 按钮 / 卡片悬停粒子动画
+- 阅读页左侧固定章节切换
+- 阅读页底部固定进度条
+
+## 当前限制
+
+- 微小说暂不支持章节系统
+- 连载小说当前只支持主线续写
+- IF 分支、段落评论、标签筛选、竞标、分析图谱仍属于后续 Sprint
+
+## 下一步建议
+
+优先建议进入 Sprint 2：
+
+- 段落评论
+- 小说标签
+- 分类筛选
+
+之后再进入：
+
+- IF 分支
+- 竞标续写
+- 结构图可视化
