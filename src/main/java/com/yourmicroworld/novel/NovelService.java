@@ -28,16 +28,33 @@ public class NovelService {
     @Transactional
     public NovelDetail create(String username, NovelRequest request) {
         AppUser author = user(username);
+        NovelType type = parseType(request.type());
+
+        validateCreateRequest(type, request);
+
         Novel novel = novelRepository.save(new Novel(
                 request.title(),
                 author,
+                type,
                 request.description(),
+                type == NovelType.MICRO ? clean(request.microContent()) : null,
                 request.worldSetting(),
                 request.outlineContent(),
-                request.allowIfBranch(),
-                request.allowBid()
+                type == NovelType.SERIAL && request.allowIfBranch(),
+                type == NovelType.SERIAL && request.allowBid()
         ));
-        chapterRepository.save(new Chapter(novel, null, author, request.firstChapterTitle(), request.firstChapterContent(), 1));
+
+        if (type == NovelType.SERIAL) {
+            chapterRepository.save(new Chapter(
+                    novel,
+                    null,
+                    author,
+                    clean(request.firstChapterTitle()),
+                    clean(request.firstChapterContent()),
+                    1
+            ));
+        }
+
         return detail(novel);
     }
 
@@ -58,11 +75,17 @@ public class NovelService {
     public ChapterResponse addMainChapter(Long novelId, String username, ChapterRequest request) {
         Novel novel = novel(novelId);
         AppUser author = user(username);
+
+        if (novel.getType() != NovelType.SERIAL) {
+            throw new IllegalArgumentException("微小说不支持追加后续章节");
+        }
         if (!novel.getAuthor().getId().equals(author.getId())) {
             throw new IllegalArgumentException("只有原作者可以在当前 Sprint 续写主线");
         }
+
         Chapter latest = chapterRepository.findTopByNovelIdAndTypeOrderBySequenceNoDesc(novelId, "MAIN")
                 .orElseThrow(() -> new IllegalArgumentException("当前小说还没有可续写的主线章节"));
+
         Chapter saved = chapterRepository.save(new Chapter(
                 novel,
                 latest,
@@ -76,7 +99,10 @@ public class NovelService {
 
     @Transactional(readOnly = true)
     public List<ChapterResponse> chapters(Long novelId) {
-        novel(novelId);
+        Novel novel = novel(novelId);
+        if (novel.getType() != NovelType.SERIAL) {
+            return List.of();
+        }
         return chapterRepository.findByNovelIdAndTypeOrderBySequenceNoAsc(novelId, "MAIN")
                 .stream()
                 .map(ChapterResponse::from)
@@ -95,7 +121,9 @@ public class NovelService {
         return new NovelDetail(
                 novel.getId(),
                 novel.getTitle(),
+                novel.getType().name(),
                 novel.getDescription(),
+                novel.getMicroContent(),
                 novel.getWorldSetting(),
                 novel.getOutlineContent(),
                 novel.getAuthor().getId(),
@@ -105,6 +133,35 @@ public class NovelService {
                 novel.getCreatedAt(),
                 chapters(novel.getId())
         );
+    }
+
+    private void validateCreateRequest(NovelType type, NovelRequest request) {
+        if (type == NovelType.MICRO) {
+            if (blank(request.microContent())) {
+                throw new IllegalArgumentException("微小说必须填写正文");
+            }
+            return;
+        }
+
+        if (blank(request.firstChapterTitle()) || blank(request.firstChapterContent())) {
+            throw new IllegalArgumentException("连载小说必须填写第一章标题和正文");
+        }
+    }
+
+    private NovelType parseType(String rawType) {
+        try {
+            return NovelType.valueOf(rawType == null ? "" : rawType.trim().toUpperCase());
+        } catch (Exception ignored) {
+            throw new IllegalArgumentException("小说类型无效，只能是 MICRO 或 SERIAL");
+        }
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private String clean(String value) {
+        return value == null ? null : value.trim();
     }
 
     private Novel novel(Long id) {
