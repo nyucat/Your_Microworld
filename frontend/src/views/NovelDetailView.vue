@@ -186,6 +186,7 @@ onMounted(load)
                 :active-paragraph-index="activeParagraphIndex"
                 :active-paragraph="activeParagraph"
                 :comments="activeComments"
+                :author-name="novel.authorName"
                 :error="error"
                 :user="user"
                 :has-token="hasToken"

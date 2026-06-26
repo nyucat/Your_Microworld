@@ -29,22 +29,27 @@ public class NovelController {
         return ApiResponse.ok(service.list(page, size, tag, category));
     }
 
+    @GetMapping("/category-overview")
+    public ApiResponse<CategoryOverviewResponse> categoryOverview(@RequestParam(required = false) String category) {
+        return ApiResponse.ok(service.categoryOverview(category));
+    }
+
     @PostMapping
     public ApiResponse<NovelDetail> create(Authentication auth, @Valid @RequestBody NovelRequest request) {
         return ApiResponse.ok(service.create(auth.getName(), request), "小说发布成功");
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ApiResponse<NovelDetail> detail(@PathVariable Long id) {
         return ApiResponse.ok(service.detail(id));
     }
 
-    @GetMapping("/{id}/chapters")
+    @GetMapping("/{id:\\d+}/chapters")
     public ApiResponse<List<ChapterResponse>> chapters(@PathVariable Long id) {
         return ApiResponse.ok(service.chapters(id));
     }
 
-    @PostMapping("/{id}/chapters")
+    @PostMapping("/{id:\\d+}/chapters")
     public ApiResponse<ChapterResponse> addChapter(@PathVariable Long id, Authentication auth, @Valid @RequestBody ChapterRequest request) {
         return ApiResponse.ok(service.addMainChapter(id, auth.getName(), request), "章节发布成功");
     }

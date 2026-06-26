@@ -5,6 +5,7 @@ const props = defineProps({
   activeParagraphIndex: Number,
   activeParagraph: { type: String, default: '' },
   comments: { type: Array, default: () => [] },
+  authorName: { type: String, default: '' },
   error: { type: String, default: '' },
   user: { type: Object, default: null },
   hasToken: { type: Boolean, default: false },
@@ -16,6 +17,37 @@ const emit = defineEmits(['submit-comment', 'toggle-like'])
 
 const replyForms = reactive({})
 const replyTargetId = ref(null)
+const sortBy = ref('latest')
+
+function formatRelativeTime(value) {
+  if (!value) return ''
+
+  const target = new Date(value).getTime()
+  const now = Date.now()
+  const diff = Math.max(0, now - target)
+
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  if (diff < minute) return '刚刚'
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`
+  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`
+
+  return new Date(value).toLocaleDateString('zh-CN')
+}
+
+function sortCommentItems(items) {
+  return [...items].sort((a, b) => {
+    if (sortBy.value === 'hot') {
+      if ((b.likeCount || 0) !== (a.likeCount || 0)) {
+        return (b.likeCount || 0) - (a.likeCount || 0)
+      }
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
 
 function rootCommentIdOf(comment) {
   let current = comment
@@ -26,15 +58,35 @@ function rootCommentIdOf(comment) {
 }
 
 const topLevelComments = computed(() =>
-  props.comments
+  sortCommentItems(
+    props.comments
     .filter((item) => item.parentCommentId == null)
     .map((item) => ({
       ...item,
-      replies: props.comments.filter((reply) => reply.parentCommentId != null && rootCommentIdOf(reply) === item.id)
+      replies: sortCommentItems(
+        props.comments.filter((reply) => reply.parentCommentId != null && rootCommentIdOf(reply) === item.id)
+      )
     }))
+  )
 )
 
+const floorMap = computed(() => {
+  const ordered = [...props.comments]
+    .filter((item) => item.parentCommentId == null)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+  return new Map(ordered.map((item, index) => [item.id, index + 1]))
+})
+
 const likingSet = computed(() => new Set(props.likingCommentIds))
+
+function floorOf(commentId) {
+  return floorMap.value.get(commentId) || 0
+}
+
+function isAuthorComment(username) {
+  return Boolean(props.authorName) && username === props.authorName
+}
 
 function replyTargetNameOf(comment) {
   if (comment.parentUsername) return comment.parentUsername
@@ -92,6 +144,14 @@ watch(() => props.activeParagraphIndex, () => {
     </div>
 
     <template v-if="activeParagraphIndex != null">
+      <div class="comment-sort-bar">
+        <span class="comment-sort-label">排序方式</span>
+        <div class="comment-sort-actions">
+          <button class="comment-sort-chip" :class="{ active: sortBy === 'latest' }" @click="sortBy = 'latest'">最新</button>
+          <button class="comment-sort-chip" :class="{ active: sortBy === 'hot' }" @click="sortBy = 'hot'">最热</button>
+        </div>
+      </div>
+
       <blockquote class="reader-comment-quote">
         {{ activeParagraph }}
       </blockquote>
@@ -102,8 +162,12 @@ watch(() => props.activeParagraphIndex, () => {
         <article v-for="comment in topLevelComments" :key="comment.id" class="comment-thread-card">
           <div class="comment-thread-main">
             <div class="comment-meta">
-              <strong>{{ comment.username }}</strong>
-              <span>{{ new Date(comment.createdAt).toLocaleString('zh-CN') }}</span>
+              <div class="comment-meta-main">
+                <strong>{{ comment.username }}</strong>
+                <span v-if="isAuthorComment(comment.username)" class="comment-author-badge">作者</span>
+                <span class="comment-floor">#{{ floorOf(comment.id) }}</span>
+              </div>
+              <span>{{ formatRelativeTime(comment.createdAt) }}</span>
             </div>
             <p class="comment-body">{{ comment.content }}</p>
 
@@ -136,8 +200,11 @@ watch(() => props.activeParagraphIndex, () => {
               class="comment-reply-item"
             >
               <div class="comment-meta compact">
-                <strong>{{ reply.username }}</strong>
-                <span>{{ new Date(reply.createdAt).toLocaleString('zh-CN') }}</span>
+                <div class="comment-meta-main">
+                  <strong>{{ reply.username }}</strong>
+                  <span v-if="isAuthorComment(reply.username)" class="comment-author-badge">作者</span>
+                </div>
+                <span>{{ formatRelativeTime(reply.createdAt) }}</span>
               </div>
               <p class="comment-reply-content">
                 <template v-if="replyTargetNameOf(reply)">

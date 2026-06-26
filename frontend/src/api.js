@@ -45,6 +45,8 @@ export const getNovels = (page = 0, size = 12, tag = '', category = '') =>
       `${tag ? `&tag=${encodeURIComponent(tag)}` : ''}` +
       `${category ? `&category=${encodeURIComponent(category)}` : ''}`
   )
+export const getCategoryOverview = (category = '') =>
+  request(`/novels/category-overview${category ? `?category=${encodeURIComponent(category)}` : ''}`)
 export const getNovel = (id) => request(`/novels/${id}`)
 export const createNovel = (payload) => request('/novels', { method: 'POST', body: JSON.stringify(payload) })
 export const addChapter = (novelId, payload) => request(`/novels/${novelId}/chapters`, { method: 'POST', body: JSON.stringify(payload) })

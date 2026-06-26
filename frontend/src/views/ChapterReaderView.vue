@@ -229,6 +229,7 @@ watch(() => props.id, load)
             :active-paragraph-index="activeParagraphIndex"
             :active-paragraph="activeParagraph"
             :comments="activeComments"
+            :author-name="novel?.authorName || chapter?.authorName || ''"
             :error="error"
             :user="user"
             :has-token="hasToken"

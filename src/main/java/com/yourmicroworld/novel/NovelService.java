@@ -13,7 +13,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class NovelService {
@@ -100,6 +103,31 @@ public class NovelService {
                         pageable
                 )
                 .map(NovelSummary::from);
+    }
+
+    @Transactional(readOnly = true)
+    public CategoryOverviewResponse categoryOverview(String category) {
+        String normalizedCategory = normalizeCategory(category);
+
+        if (normalizedCategory == null) {
+            return new CategoryOverviewResponse(
+                    null,
+                    novelRepository.countByStatus("PUBLISHED"),
+                    novelRepository.countByStatusAndType("PUBLISHED", NovelType.SERIAL),
+                    novelRepository.countByStatusAndType("PUBLISHED", NovelType.MICRO),
+                    novelRepository.countDistinctAuthorsByStatus("PUBLISHED"),
+                    topTags(novelRepository.findAllByStatusOrderByCreatedAtDesc("PUBLISHED"))
+            );
+        }
+
+        return new CategoryOverviewResponse(
+                normalizedCategory,
+                novelRepository.countByStatusAndCategory("PUBLISHED", normalizedCategory),
+                novelRepository.countByStatusAndCategoryAndType("PUBLISHED", normalizedCategory, NovelType.SERIAL),
+                novelRepository.countByStatusAndCategoryAndType("PUBLISHED", normalizedCategory, NovelType.MICRO),
+                novelRepository.countDistinctAuthorsByStatusAndCategory("PUBLISHED", normalizedCategory),
+                topTags(novelRepository.findAllByStatusAndCategoryOrderByCreatedAtDesc("PUBLISHED", normalizedCategory))
+        );
     }
 
     @Transactional
@@ -238,6 +266,22 @@ public class NovelService {
             throw new IllegalArgumentException("小说分类无效");
         }
         return category;
+    }
+
+    private List<CategoryTagStat> topTags(List<Novel> novels) {
+        return novels.stream()
+                .flatMap(novel -> novel.getTags().stream())
+                .collect(Collectors.groupingBy(Tag::getName, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .sorted(
+                        Comparator.<Map.Entry<String, Long>>comparingLong(Map.Entry::getValue)
+                                .reversed()
+                                .thenComparing(Map.Entry::getKey)
+                )
+                .limit(8)
+                .map(entry -> new CategoryTagStat(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private Novel novel(Long id) {
