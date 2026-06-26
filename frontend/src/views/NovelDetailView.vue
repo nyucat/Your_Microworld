@@ -139,7 +139,8 @@ onMounted(load)
         <h1>{{ novel.title }}</h1>
         <p class="lead">{{ novel.description || '作者暂时还没有补充简介。' }}</p>
 
-        <div v-if="novel.tags?.length" class="detail-tags">
+        <div class="detail-tags">
+          <span v-if="novel.category" class="tag-chip category-chip">{{ novel.category }}</span>
           <span v-for="tag in novel.tags" :key="tag" class="tag-chip">{{ tag }}</span>
         </div>
 

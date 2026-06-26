@@ -978,6 +978,12 @@ button { cursor: pointer; }
   margin: 16px 0 8px;
 }
 
+.category-chip {
+  color: #7b5aa6;
+  background: rgba(244, 236, 255, 0.92);
+  border: 1px solid rgba(221, 203, 252, 0.95);
+}
+
 .tag-preview {
   margin-top: -2px;
 }
@@ -987,6 +993,10 @@ button { cursor: pointer; }
   flex-wrap: wrap;
   gap: 10px;
   margin: 0 0 18px;
+}
+
+.filter-bar-sub {
+  margin-top: -4px;
 }
 
 .filter-chip {

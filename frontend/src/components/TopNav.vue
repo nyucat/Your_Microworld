@@ -27,12 +27,12 @@ watch(
 
 <template>
   <nav class="topbar container">
-    <RouterLink class="brand brand-cute" to="/"><span>✦</span> Your Microworld</RouterLink>
+    <RouterLink class="brand brand-cute" to="/"><span>✨</span> Your Microworld</RouterLink>
 
     <div v-if="mode === 'full'" class="topbar-menu topbar-menu-cute">
       <RouterLink class="topbar-link" to="/published">已发布</RouterLink>
       <span class="topbar-divider" aria-hidden="true"></span>
-      <span class="topbar-link muted">分类</span>
+      <RouterLink class="topbar-link" to="/categories">分类</RouterLink>
       <span class="topbar-divider" aria-hidden="true"></span>
 
       <label class="topbar-search cute-search" aria-label="搜索小说">

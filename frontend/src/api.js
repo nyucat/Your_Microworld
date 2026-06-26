@@ -39,8 +39,12 @@ export const getHome = () => request('/home')
 export const getHealth = () => request('/health')
 export const register = (payload) => request('/auth/register', { method: 'POST', body: JSON.stringify(payload) })
 export const login = (payload) => request('/auth/login', { method: 'POST', body: JSON.stringify(payload) })
-export const getNovels = (page = 0, size = 12, tag = '') =>
-  request(`/novels?page=${page}&size=${size}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`)
+export const getNovels = (page = 0, size = 12, tag = '', category = '') =>
+  request(
+    `/novels?page=${page}&size=${size}` +
+      `${tag ? `&tag=${encodeURIComponent(tag)}` : ''}` +
+      `${category ? `&category=${encodeURIComponent(category)}` : ''}`
+  )
 export const getNovel = (id) => request(`/novels/${id}`)
 export const createNovel = (payload) => request('/novels', { method: 'POST', body: JSON.stringify(payload) })
 export const addChapter = (novelId, payload) => request(`/novels/${novelId}/chapters`, { method: 'POST', body: JSON.stringify(payload) })

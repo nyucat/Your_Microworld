@@ -14,9 +14,10 @@ const typeLabel = computed(() => (props.novel.type === 'MICRO' ? '微小说' : '
     <i class="hover-particle heart"></i>
 
     <div class="novel-card-top">
-      <span class="card-mark">✦</span>
+      <span class="card-mark">✨</span>
       <div class="card-badge-group">
         <span class="card-badge">{{ typeLabel }}</span>
+        <span v-if="novel.category" class="card-badge soft">{{ novel.category }}</span>
         <span class="card-badge soft">已发布</span>
       </div>
     </div>

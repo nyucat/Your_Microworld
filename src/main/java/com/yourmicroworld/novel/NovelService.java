@@ -41,6 +41,7 @@ public class NovelService {
                 author,
                 type,
                 request.description(),
+                normalizeCategory(request.category()),
                 type == NovelType.MICRO ? clean(request.microContent()) : null,
                 request.worldSetting(),
                 request.outlineContent(),
@@ -73,12 +74,31 @@ public class NovelService {
     }
 
     @Transactional(readOnly = true)
-    public Page<NovelSummary> list(int page, int size, String tag) {
+    public Page<NovelSummary> list(int page, int size, String tag, String category) {
         var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50));
-        if (blank(tag)) {
+        boolean noTag = blank(tag);
+        boolean noCategory = blank(category);
+
+        if (noTag && noCategory) {
             return novelRepository.findByStatusOrderByCreatedAtDesc("PUBLISHED", pageable).map(NovelSummary::from);
         }
-        return novelRepository.findDistinctByStatusAndTagsNameOrderByCreatedAtDesc("PUBLISHED", tag.trim(), pageable)
+
+        if (noTag) {
+            return novelRepository.findByStatusAndCategoryOrderByCreatedAtDesc("PUBLISHED", category.trim(), pageable)
+                    .map(NovelSummary::from);
+        }
+
+        if (noCategory) {
+            return novelRepository.findDistinctByStatusAndTagsNameOrderByCreatedAtDesc("PUBLISHED", tag.trim(), pageable)
+                    .map(NovelSummary::from);
+        }
+
+        return novelRepository.findDistinctByStatusAndCategoryAndTagsNameOrderByCreatedAtDesc(
+                        "PUBLISHED",
+                        category.trim(),
+                        tag.trim(),
+                        pageable
+                )
                 .map(NovelSummary::from);
     }
 
@@ -142,6 +162,7 @@ public class NovelService {
                 novel.getTitle(),
                 novel.getType().name(),
                 novel.getDescription(),
+                novel.getCategory(),
                 novel.getTags().stream().map(Tag::getName).sorted().toList(),
                 novel.getMicroContent(),
                 novel.getWorldSetting(),
@@ -173,11 +194,12 @@ public class NovelService {
             if (blank(request.microContent())) {
                 throw new IllegalArgumentException("微小说必须填写正文");
             }
-            return;
+        } else if (blank(request.firstChapterTitle()) || blank(request.firstChapterContent())) {
+            throw new IllegalArgumentException("连载小说必须填写第一章标题和正文");
         }
 
-        if (blank(request.firstChapterTitle()) || blank(request.firstChapterContent())) {
-            throw new IllegalArgumentException("连载小说必须填写第一章标题和正文");
+        if (blank(request.category())) {
+            throw new IllegalArgumentException("请选择小说分类");
         }
     }
 
@@ -207,6 +229,15 @@ public class NovelService {
                 .limit(5)
                 .map(tagName -> tagRepository.findByName(tagName).orElseGet(() -> tagRepository.save(new Tag(tagName))))
                 .toList();
+    }
+
+    private String normalizeCategory(String rawCategory) {
+        String category = clean(rawCategory);
+        if (blank(category)) return null;
+        if (!NovelCategories.ALL_SET.contains(category)) {
+            throw new IllegalArgumentException("小说分类无效");
+        }
+        return category;
     }
 
     private Novel novel(Long id) {

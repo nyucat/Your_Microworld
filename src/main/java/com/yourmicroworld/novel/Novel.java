@@ -37,6 +37,9 @@ public class Novel {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 40)
+    private String category;
+
     @Column(name = "micro_content", columnDefinition = "LONGTEXT")
     private String microContent;
 
@@ -68,6 +71,7 @@ public class Novel {
             AppUser author,
             NovelType type,
             String description,
+            String category,
             String microContent,
             String worldSetting,
             String outlineContent,
@@ -78,6 +82,7 @@ public class Novel {
         this.author = author;
         this.type = type;
         this.description = description;
+        this.category = category;
         this.microContent = microContent;
         this.worldSetting = worldSetting;
         this.outlineContent = outlineContent;
@@ -96,6 +101,7 @@ public class Novel {
     public Set<Tag> getTags() { return tags; }
     public NovelType getType() { return type; }
     public String getDescription() { return description; }
+    public String getCategory() { return category; }
     public String getMicroContent() { return microContent; }
     public String getWorldSetting() { return worldSetting; }
     public String getOutlineContent() { return outlineContent; }

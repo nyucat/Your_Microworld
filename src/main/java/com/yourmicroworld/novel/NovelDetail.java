@@ -10,6 +10,7 @@ public record NovelDetail(
         String title,
         String type,
         String description,
+        String category,
         List<String> tags,
         String microContent,
         String worldSetting,

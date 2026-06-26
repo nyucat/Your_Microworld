@@ -23,9 +23,10 @@ public class NovelController {
     public ApiResponse<Page<NovelSummary>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
-            @RequestParam(required = false) String tag
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String category
     ) {
-        return ApiResponse.ok(service.list(page, size, tag));
+        return ApiResponse.ok(service.list(page, size, tag, category));
     }
 
     @PostMapping

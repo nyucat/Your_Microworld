@@ -9,8 +9,9 @@ import UserProfileView from '../views/UserProfileView.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: HomeView },
-    { path: '/published', component: HomeView },
+    { path: '/', component: HomeView, props: { pageType: 'home' } },
+    { path: '/published', component: HomeView, props: { pageType: 'published' } },
+    { path: '/categories', component: HomeView, props: { pageType: 'categories' } },
     { path: '/login', component: AuthView, props: { initialMode: 'login' } },
     { path: '/register', component: AuthView, props: { initialMode: 'register' } },
     { path: '/novels/create', component: CreateNovelView, meta: { requiresAuth: true } },

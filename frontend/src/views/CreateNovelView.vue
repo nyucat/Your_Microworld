@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createNovel } from '../api'
+import { NOVEL_CATEGORIES } from '../constants/novelCategories'
 import TopNav from '../components/TopNav.vue'
 import WritingPen from '../components/WritingPen.vue'
 
@@ -13,6 +14,7 @@ const form = reactive({
   title: '',
   type: 'SERIAL',
   description: '',
+  category: '奇幻',
   microContent: '',
   worldSetting: '',
   outlineContent: '',
@@ -88,6 +90,15 @@ async function submit() {
       <label>
         简介
         <textarea v-model.trim="form.description" maxlength="5000" placeholder="这部小说讲述了什么？"></textarea>
+      </label>
+
+      <label>
+        小说分类
+        <select v-model="form.category" required>
+          <option v-for="category in NOVEL_CATEGORIES" :key="category" :value="category">
+            {{ category }}
+          </option>
+        </select>
       </label>
 
       <label>
