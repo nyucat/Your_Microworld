@@ -2,8 +2,11 @@ package com.yourmicroworld.novel;
 
 import com.yourmicroworld.user.AppUser;
 import jakarta.persistence.*;
+import com.yourmicroworld.tag.Tag;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "novel")
@@ -18,6 +21,14 @@ public class Novel {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
     private AppUser author;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "novel_tag",
+            joinColumns = @JoinColumn(name = "novel_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new LinkedHashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -82,6 +93,7 @@ public class Novel {
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public AppUser getAuthor() { return author; }
+    public Set<Tag> getTags() { return tags; }
     public NovelType getType() { return type; }
     public String getDescription() { return description; }
     public String getMicroContent() { return microContent; }

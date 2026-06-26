@@ -4,6 +4,8 @@ import com.yourmicroworld.chapter.Chapter;
 import com.yourmicroworld.chapter.ChapterRepository;
 import com.yourmicroworld.chapter.ChapterRequest;
 import com.yourmicroworld.chapter.ChapterResponse;
+import com.yourmicroworld.tag.Tag;
+import com.yourmicroworld.tag.TagRepository;
 import com.yourmicroworld.user.AppUser;
 import com.yourmicroworld.user.UserRepository;
 import org.springframework.data.domain.Page;
@@ -18,11 +20,13 @@ public class NovelService {
     private final NovelRepository novelRepository;
     private final ChapterRepository chapterRepository;
     private final UserRepository userRepository;
+    private final TagRepository tagRepository;
 
-    public NovelService(NovelRepository novelRepository, ChapterRepository chapterRepository, UserRepository userRepository) {
+    public NovelService(NovelRepository novelRepository, ChapterRepository chapterRepository, UserRepository userRepository, TagRepository tagRepository) {
         this.novelRepository = novelRepository;
         this.chapterRepository = chapterRepository;
         this.userRepository = userRepository;
+        this.tagRepository = tagRepository;
     }
 
     @Transactional
@@ -43,6 +47,7 @@ public class NovelService {
                 type == NovelType.SERIAL && request.allowIfBranch(),
                 type == NovelType.SERIAL && request.allowBid()
         ));
+        novel.getTags().addAll(resolveTags(request.tags()));
 
         if (type == NovelType.SERIAL) {
             chapterRepository.save(new Chapter(
@@ -53,20 +58,31 @@ public class NovelService {
                     clean(request.firstChapterContent()),
                     1
             ));
+        } else {
+            chapterRepository.save(new Chapter(
+                    novel,
+                    null,
+                    author,
+                    request.title(),
+                    clean(request.microContent()),
+                    1
+            ));
         }
 
         return detail(novel);
     }
 
     @Transactional(readOnly = true)
-    public Page<NovelSummary> list(int page, int size) {
-        return novelRepository.findByStatusOrderByCreatedAtDesc(
-                "PUBLISHED",
-                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50))
-        ).map(NovelSummary::from);
+    public Page<NovelSummary> list(int page, int size, String tag) {
+        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50));
+        if (blank(tag)) {
+            return novelRepository.findByStatusOrderByCreatedAtDesc("PUBLISHED", pageable).map(NovelSummary::from);
+        }
+        return novelRepository.findDistinctByStatusAndTagsNameOrderByCreatedAtDesc("PUBLISHED", tag.trim(), pageable)
+                .map(NovelSummary::from);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public NovelDetail detail(Long id) {
         return detail(novel(id));
     }
@@ -118,11 +134,15 @@ public class NovelService {
     }
 
     private NovelDetail detail(Novel novel) {
+        Long microChapterId = novel.getType() == NovelType.MICRO
+                ? ensureMicroChapter(novel).getId()
+                : null;
         return new NovelDetail(
                 novel.getId(),
                 novel.getTitle(),
                 novel.getType().name(),
                 novel.getDescription(),
+                novel.getTags().stream().map(Tag::getName).sorted().toList(),
                 novel.getMicroContent(),
                 novel.getWorldSetting(),
                 novel.getOutlineContent(),
@@ -130,9 +150,22 @@ public class NovelService {
                 novel.getAuthor().getUsername(),
                 novel.isAllowIfBranch(),
                 novel.isAllowBid(),
+                microChapterId,
                 novel.getCreatedAt(),
                 chapters(novel.getId())
         );
+    }
+
+    private Chapter ensureMicroChapter(Novel novel) {
+        return chapterRepository.findTopByNovelIdOrderBySequenceNoAsc(novel.getId())
+                .orElseGet(() -> chapterRepository.save(new Chapter(
+                        novel,
+                        null,
+                        novel.getAuthor(),
+                        novel.getTitle(),
+                        clean(novel.getMicroContent()),
+                        1
+                )));
     }
 
     private void validateCreateRequest(NovelType type, NovelRequest request) {
@@ -162,6 +195,18 @@ public class NovelService {
 
     private String clean(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private java.util.List<Tag> resolveTags(java.util.List<String> rawTags) {
+        if (rawTags == null || rawTags.isEmpty()) return java.util.List.of();
+
+        return rawTags.stream()
+                .filter(tag -> tag != null && !tag.trim().isEmpty())
+                .map(tag -> tag.trim())
+                .distinct()
+                .limit(5)
+                .map(tagName -> tagRepository.findByName(tagName).orElseGet(() -> tagRepository.save(new Tag(tagName))))
+                .toList();
     }
 
     private Novel novel(Long id) {

@@ -10,6 +10,7 @@ public record NovelDetail(
         String title,
         String type,
         String description,
+        List<String> tags,
         String microContent,
         String worldSetting,
         String outlineContent,
@@ -17,6 +18,7 @@ public record NovelDetail(
         String authorName,
         boolean allowIfBranch,
         boolean allowBid,
+        Long microChapterId,
         Instant createdAt,
         List<ChapterResponse> chapters
 ) {}

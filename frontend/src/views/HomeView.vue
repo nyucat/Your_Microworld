@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getHealth, getNovels } from '../api'
+import { getHealth, getNovels, getTags } from '../api'
 import TopNav from '../components/TopNav.vue'
 import NovelCard from '../components/NovelCard.vue'
 import AnimatedBook from '../components/AnimatedBook.vue'
@@ -11,20 +11,31 @@ const route = useRoute()
 const user = ref(JSON.parse(localStorage.getItem('microworld-user') || 'null'))
 const healthy = ref(false)
 const novels = ref([])
+const allTags = ref([])
 const loading = ref(true)
 const searchKeyword = ref('')
+const activeTag = ref('')
 
 const isPublishedPage = computed(() => route.path === '/published')
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
   try {
-    const [health, list] = await Promise.all([getHealth(), getNovels()])
+    const [health, list, tags] = await Promise.all([
+      getHealth(),
+      getNovels(0, 12, activeTag.value),
+      getTags()
+    ])
     healthy.value = health.status === 'UP'
     novels.value = list.content
+    allTags.value = tags
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
+watch(activeTag, load)
 
 function logout() {
   localStorage.removeItem('microworld-user')
@@ -38,7 +49,7 @@ const filteredNovels = computed(() => {
   if (!keyword) return novels.value
 
   return novels.value.filter((novel) =>
-    [novel.title, novel.description, novel.authorName]
+    [novel.title, novel.description, novel.authorName, ...(novel.tags || [])]
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(keyword))
   )
@@ -106,6 +117,19 @@ const filteredNovels = computed(() => {
           <h2>{{ isPublishedPage ? '已发布' : '最新发布' }}</h2>
         </div>
         <span class="count-pill">{{ filteredNovels.length }} 部小说</span>
+      </div>
+
+      <div v-if="allTags.length" class="filter-bar">
+        <button class="filter-chip" :class="{ active: activeTag === '' }" @click="activeTag = ''">全部</button>
+        <button
+          v-for="tag in allTags"
+          :key="tag"
+          class="filter-chip"
+          :class="{ active: activeTag === tag }"
+          @click="activeTag = tag"
+        >
+          {{ tag }}
+        </button>
       </div>
 
       <div v-if="loading" class="empty-state cute-empty">正在加载小说…</div>

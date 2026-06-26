@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { addChapter, getNovel } from '../api'
+import { addChapter, createComment, getChapterComments, getNovel, toggleCommentLike } from '../api'
 import TopNav from '../components/TopNav.vue'
+import ParagraphCommentPanel from '../components/ParagraphCommentPanel.vue'
 
 const props = defineProps({ id: String })
 const router = useRouter()
@@ -11,17 +12,55 @@ const error = ref('')
 const publishing = ref(false)
 const form = reactive({ title: '', content: '' })
 const user = ref(JSON.parse(localStorage.getItem('microworld-user') || 'null'))
+const hasToken = computed(() => Boolean(localStorage.getItem('microworld-token')))
+const comments = ref([])
+const activeParagraphIndex = ref(null)
+const submittingParagraph = ref(null)
+const likingCommentIds = ref([])
 
 const owner = computed(() => user.value?.userId === novel.value?.authorId)
 const isMicro = computed(() => novel.value?.type === 'MICRO')
 const typeLabel = computed(() => (isMicro.value ? '微小说' : '连载小说'))
+const microParagraphs = computed(() =>
+  (novel.value?.microContent || '').split(/\n\s*\n|\r?\n/).map((item) => item.trim()).filter(Boolean)
+)
+const activeParagraph = computed(() =>
+  activeParagraphIndex.value == null ? '' : microParagraphs.value[activeParagraphIndex.value] || ''
+)
+const activeComments = computed(() =>
+  activeParagraphIndex.value == null
+    ? []
+    : comments.value.filter((item) => item.paragraphIndex === activeParagraphIndex.value)
+)
+
+function commentsOf(index) {
+  return comments.value.filter((item) => item.paragraphIndex === index)
+}
 
 async function load() {
   try {
+    error.value = ''
     novel.value = await getNovel(props.id)
+    comments.value = []
+    activeParagraphIndex.value = null
+
+    if (novel.value?.type === 'MICRO' && novel.value?.microChapterId) {
+      comments.value = await getChapterComments(novel.value.microChapterId)
+    }
   } catch (e) {
     error.value = e.message
   }
+}
+
+async function ensureMicroChapterId() {
+  if (novel.value?.microChapterId) return novel.value.microChapterId
+
+  const refreshed = await getNovel(props.id)
+  novel.value = refreshed
+
+  if (refreshed?.microChapterId) return refreshed.microChapterId
+
+  throw new Error('微小说评论通道还没有就绪。请重启后端后再试一次。')
 }
 
 async function submitChapter() {
@@ -35,6 +74,48 @@ async function submitChapter() {
   } finally {
     publishing.value = false
   }
+}
+
+async function handleSubmitMicroComment({ paragraphIndex, content, parentCommentId, reset }) {
+  const text = content.trim()
+  if (!text) return
+
+  submittingParagraph.value = paragraphIndex
+  try {
+    error.value = ''
+    const chapterId = await ensureMicroChapterId()
+    const saved = await createComment(chapterId, {
+      paragraphIndex,
+      parentCommentId,
+      content: text
+    })
+    comments.value = [...comments.value, saved]
+    activeParagraphIndex.value = paragraphIndex
+    reset?.()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    submittingParagraph.value = null
+  }
+}
+
+async function handleToggleLike(commentId) {
+  if (likingCommentIds.value.includes(commentId)) return
+
+  likingCommentIds.value = [...likingCommentIds.value, commentId]
+  try {
+    error.value = ''
+    const updated = await toggleCommentLike(commentId)
+    comments.value = comments.value.map((item) => (item.id === commentId ? updated : item))
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    likingCommentIds.value = likingCommentIds.value.filter((id) => id !== commentId)
+  }
+}
+
+function toggleParagraph(index) {
+  activeParagraphIndex.value = activeParagraphIndex.value === index ? null : index
 }
 
 function openChapter(id) {
@@ -56,10 +137,14 @@ onMounted(load)
         </div>
 
         <h1>{{ novel.title }}</h1>
-        <p class="lead">{{ novel.description || '作者暂时还没有添加简介。' }}</p>
+        <p class="lead">{{ novel.description || '作者暂时还没有补充简介。' }}</p>
+
+        <div v-if="novel.tags?.length" class="detail-tags">
+          <span v-for="tag in novel.tags" :key="tag" class="tag-chip">{{ tag }}</span>
+        </div>
 
         <details v-if="novel.worldSetting || novel.outlineContent" class="meta cute-meta">
-          <summary>世界观与大纲</summary>
+          <summary>世界设定 / 大纲</summary>
           <p v-if="novel.worldSetting">{{ novel.worldSetting }}</p>
           <p v-if="novel.outlineContent">{{ novel.outlineContent }}</p>
         </details>
@@ -69,10 +154,46 @@ onMounted(load)
             <h2>正文</h2>
           </div>
 
-          <div class="content micro-content">
-            <p v-for="(paragraph, index) in (novel.microContent || '').split(/\n\s*\n|\r?\n/)" :key="index">
-              {{ paragraph }}
-            </p>
+          <div class="micro-reader-layout">
+            <div class="content micro-content">
+              <section
+                v-for="(paragraph, index) in microParagraphs"
+                :key="index"
+                class="paragraph-block"
+                :class="{ active: activeParagraphIndex === index }"
+              >
+                <p class="paragraph-line">
+                  <span>{{ paragraph }}</span>
+                  <button
+                    class="comment-toggle-inline sparkle-button"
+                    :class="{ expanded: activeParagraphIndex === index }"
+                    @click="toggleParagraph(index)"
+                  >
+                    <i class="hover-particle star"></i>
+                    <i class="hover-particle heart"></i>
+                    <span class="comment-bubble-icon">
+                      <span class="comment-bubble-number">{{ commentsOf(index).length }}</span>
+                    </span>
+                    <span class="comment-bubble-arrow">⌃</span>
+                  </button>
+                </p>
+              </section>
+            </div>
+
+            <aside class="reader-comment-panel floating-card micro-comment-panel">
+              <ParagraphCommentPanel
+                :active-paragraph-index="activeParagraphIndex"
+                :active-paragraph="activeParagraph"
+                :comments="activeComments"
+                :error="error"
+                :user="user"
+                :has-token="hasToken"
+                :submitting-paragraph="submittingParagraph"
+                :liking-comment-ids="likingCommentIds"
+                @submit-comment="handleSubmitMicroComment"
+                @toggle-like="handleToggleLike"
+              />
+            </aside>
           </div>
         </section>
       </div>

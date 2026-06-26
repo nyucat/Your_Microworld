@@ -8,6 +8,7 @@ import WritingPen from '../components/WritingPen.vue'
 const router = useRouter()
 const saving = ref(false)
 const error = ref('')
+const tagInput = ref('')
 const form = reactive({
   title: '',
   type: 'SERIAL',
@@ -22,12 +23,22 @@ const form = reactive({
 })
 
 const isMicro = computed(() => form.type === 'MICRO')
+const parsedTags = computed(() =>
+  tagInput.value
+    .split(/[，,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+)
 
 async function submit() {
   saving.value = true
   error.value = ''
   try {
-    const novel = await createNovel(form)
+    const novel = await createNovel({
+      ...form,
+      tags: parsedTags.value
+    })
     router.push(`/novels/${novel.id}`)
   } catch (e) {
     error.value = e.message
@@ -78,6 +89,15 @@ async function submit() {
         简介
         <textarea v-model.trim="form.description" maxlength="5000" placeholder="这部小说讲述了什么？"></textarea>
       </label>
+
+      <label>
+        小说标签
+        <input v-model.trim="tagInput" maxlength="120" placeholder="例如：校园, 奇幻, 科幻（最多 5 个，用逗号分隔）" />
+      </label>
+
+      <div v-if="parsedTags.length" class="tag-preview">
+        <span v-for="tag in parsedTags" :key="tag" class="tag-chip">{{ tag }}</span>
+      </div>
 
       <template v-if="isMicro">
         <p class="eyebrow">MICRO STORY</p>

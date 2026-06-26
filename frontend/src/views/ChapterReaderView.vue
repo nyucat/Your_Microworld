@@ -1,16 +1,27 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getChapter, getNovel } from '../api'
+import { createComment, getChapter, getChapterComments, getNovel, toggleCommentLike } from '../api'
 import TopNav from '../components/TopNav.vue'
 import AnimatedBook from '../components/AnimatedBook.vue'
+import ParagraphCommentPanel from '../components/ParagraphCommentPanel.vue'
 
 const props = defineProps({ id: String })
 const router = useRouter()
+const user = ref(JSON.parse(localStorage.getItem('microworld-user') || 'null'))
+const hasToken = computed(() => Boolean(localStorage.getItem('microworld-token')))
 const chapter = ref(null)
 const novel = ref(null)
+const comments = ref([])
 const error = ref('')
 const readingProgress = ref(0)
+const activeParagraphIndex = ref(null)
+const submittingParagraph = ref(null)
+const likingCommentIds = ref([])
+
+const paragraphs = computed(() =>
+  chapter.value ? chapter.value.content.split(/\n\s*\n|\r?\n/).map((item) => item.trim()).filter(Boolean) : []
+)
 
 const currentIndex = computed(() => {
   if (!chapter.value || !novel.value?.chapters?.length) return -1
@@ -29,17 +40,38 @@ const nextChapter = computed(() =>
 
 const progressText = computed(() => `${Math.round(readingProgress.value)}%`)
 
+const activeParagraph = computed(() =>
+  activeParagraphIndex.value == null ? '' : paragraphs.value[activeParagraphIndex.value] || ''
+)
+
+const activeComments = computed(() =>
+  activeParagraphIndex.value == null
+    ? []
+    : comments.value.filter((item) => item.paragraphIndex === activeParagraphIndex.value)
+)
+
+function commentsOf(index) {
+  return comments.value.filter((item) => item.paragraphIndex === index)
+}
+
 async function load() {
   error.value = ''
   chapter.value = null
   novel.value = null
+  comments.value = []
+  activeParagraphIndex.value = null
   readingProgress.value = 0
   window.scrollTo({ top: 0, behavior: 'smooth' })
 
   try {
     const currentChapter = await getChapter(props.id)
     chapter.value = currentChapter
-    novel.value = await getNovel(currentChapter.novelId)
+    const [novelDetail, chapterComments] = await Promise.all([
+      getNovel(currentChapter.novelId),
+      getChapterComments(currentChapter.id)
+    ])
+    novel.value = novelDetail
+    comments.value = chapterComments
     updateProgress()
   } catch (e) {
     error.value = e.message
@@ -49,6 +81,47 @@ async function load() {
 function openChapter(chapterId) {
   if (!chapterId || String(chapterId) === String(props.id)) return
   router.push(`/chapters/${chapterId}`)
+}
+
+function toggleParagraph(index) {
+  activeParagraphIndex.value = activeParagraphIndex.value === index ? null : index
+}
+
+async function handleSubmitComment({ paragraphIndex, content, parentCommentId, reset }) {
+  const text = content.trim()
+  if (!text) return
+
+  submittingParagraph.value = paragraphIndex
+  try {
+    error.value = ''
+    const saved = await createComment(chapter.value.id, {
+      paragraphIndex,
+      parentCommentId,
+      content: text
+    })
+    comments.value = [...comments.value, saved]
+    activeParagraphIndex.value = paragraphIndex
+    reset?.()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    submittingParagraph.value = null
+  }
+}
+
+async function handleToggleLike(commentId) {
+  if (likingCommentIds.value.includes(commentId)) return
+
+  likingCommentIds.value = [...likingCommentIds.value, commentId]
+  try {
+    error.value = ''
+    const updated = await toggleCommentLike(commentId)
+    comments.value = comments.value.map((item) => (item.id === commentId ? updated : item))
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    likingCommentIds.value = likingCommentIds.value.filter((id) => id !== commentId)
+  }
 }
 
 function updateProgress() {
@@ -110,24 +183,62 @@ watch(() => props.id, load)
         </div>
       </aside>
 
-      <article class="reader container floating-card reader-card reader-animated">
-        <div class="reader-topbar">
-          <div>
-            <p class="eyebrow">{{ chapter.novelTitle }} · 第 {{ chapter.sequenceNo }} 章</p>
-            <h1>{{ chapter.title }}</h1>
-            <p class="reader-author">
-              <RouterLink :to="`/users/${chapter.authorId}`" class="author-link">{{ chapter.authorName }}</RouterLink>
-              <span> · {{ new Date(chapter.createdAt).toLocaleDateString('zh-CN') }}</span>
-            </p>
+      <section class="reader-layout container reader-shell">
+        <article class="reader floating-card reader-card reader-animated">
+          <div class="reader-topbar">
+            <div>
+              <p class="eyebrow">{{ chapter.novelTitle }} · 第 {{ chapter.sequenceNo }} 章</p>
+              <h1>{{ chapter.title }}</h1>
+              <p class="reader-author">
+                <RouterLink :to="`/users/${chapter.authorId}`" class="author-link">{{ chapter.authorName }}</RouterLink>
+                <span> · {{ new Date(chapter.createdAt).toLocaleDateString('zh-CN') }}</span>
+              </p>
+            </div>
+
+            <AnimatedBook />
           </div>
 
-          <AnimatedBook />
-        </div>
+          <div class="content">
+            <section
+              v-for="(paragraph, index) in paragraphs"
+              :key="index"
+              class="paragraph-block"
+              :class="{ active: activeParagraphIndex === index }"
+            >
+              <p class="paragraph-line">
+                <span>{{ paragraph }}</span>
+                <button
+                  class="comment-toggle-inline sparkle-button"
+                  :class="{ expanded: activeParagraphIndex === index }"
+                  @click="toggleParagraph(index)"
+                >
+                  <i class="hover-particle star"></i>
+                  <i class="hover-particle heart"></i>
+                  <span class="comment-bubble-icon">
+                    <span class="comment-bubble-number">{{ commentsOf(index).length }}</span>
+                  </span>
+                  <span class="comment-bubble-arrow">⌃</span>
+                </button>
+              </p>
+            </section>
+          </div>
+        </article>
 
-        <div class="content">
-          <p v-for="(paragraph, index) in chapter.content.split(/\n\s*\n|\r?\n/)" :key="index">{{ paragraph }}</p>
-        </div>
-      </article>
+        <aside class="reader-comment-panel floating-card">
+          <ParagraphCommentPanel
+            :active-paragraph-index="activeParagraphIndex"
+            :active-paragraph="activeParagraph"
+            :comments="activeComments"
+            :error="error"
+            :user="user"
+            :has-token="hasToken"
+            :submitting-paragraph="submittingParagraph"
+            :liking-comment-ids="likingCommentIds"
+            @submit-comment="handleSubmitComment"
+            @toggle-like="handleToggleLike"
+          />
+        </aside>
+      </section>
 
       <div class="reading-progress-shell">
         <div class="reading-progress-card">

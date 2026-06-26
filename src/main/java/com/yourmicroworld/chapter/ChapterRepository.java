@@ -5,5 +5,6 @@ import java.util.Optional;
 public interface ChapterRepository extends JpaRepository<Chapter, Long> {
     List<Chapter> findByNovelIdAndTypeOrderBySequenceNoAsc(Long novelId, String type);
     Optional<Chapter> findTopByNovelIdAndTypeOrderBySequenceNoDesc(Long novelId, String type);
+    Optional<Chapter> findTopByNovelIdOrderBySequenceNoAsc(Long novelId);
     long countByAuthorId(Long authorId);
 }

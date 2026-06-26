@@ -7,6 +7,7 @@ public record NovelSummary(
         String title,
         String type,
         String description,
+        java.util.List<String> tags,
         Long authorId,
         String authorName,
         Instant createdAt
@@ -17,6 +18,7 @@ public record NovelSummary(
                 novel.getTitle(),
                 novel.getType().name(),
                 novel.getDescription(),
+                novel.getTags().stream().map(com.yourmicroworld.tag.Tag::getName).sorted().toList(),
                 novel.getAuthor().getId(),
                 novel.getAuthor().getUsername(),
                 novel.getCreatedAt()
