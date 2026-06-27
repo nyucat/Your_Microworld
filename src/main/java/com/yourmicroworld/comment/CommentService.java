@@ -47,7 +47,7 @@ public class CommentService {
 
         Comment parentComment = null;
         if (request.parentCommentId() != null) {
-            parentComment = comment(request.parentCommentId());
+            parentComment = visibleComment(request.parentCommentId());
             if (!parentComment.getChapter().getId().equals(chapterId)) {
                 throw new IllegalArgumentException("回复目标不在当前章节");
             }
@@ -64,7 +64,7 @@ public class CommentService {
 
     @Transactional
     public CommentResponse toggleLike(Long commentId, String username) {
-        Comment comment = comment(commentId);
+        Comment comment = visibleComment(commentId);
         AppUser user = user(username);
 
         boolean liked;
@@ -81,6 +81,20 @@ public class CommentService {
         return CommentResponse.from(comment, liked);
     }
 
+    @Transactional
+    public void delete(Long commentId, String username) {
+        Comment comment = visibleComment(commentId);
+        AppUser user = user(username);
+
+        boolean isCommentOwner = comment.getUser().getId().equals(user.getId());
+        boolean isNovelOwner = comment.getChapter().getNovel().getAuthor().getId().equals(user.getId());
+        if (!isCommentOwner && !isNovelOwner) {
+            throw new IllegalArgumentException("无权删除这条评论");
+        }
+
+        comment.markDeleted();
+    }
+
     private void validateParagraphIndex(Chapter chapter, int paragraphIndex) {
         String[] paragraphs = chapter.getContent().split("\\n\\s*\\n|\\r?\\n");
         int paragraphCount = Math.max(paragraphs.length, 1);
@@ -90,13 +104,21 @@ public class CommentService {
     }
 
     private Chapter chapter(Long chapterId) {
-        return chapterRepository.findById(chapterId)
+        Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new IllegalArgumentException("章节不存在"));
+        if (!"PUBLISHED".equals(chapter.getStatus()) || !"PUBLISHED".equals(chapter.getNovel().getStatus())) {
+            throw new IllegalArgumentException("章节不存在");
+        }
+        return chapter;
     }
 
-    private Comment comment(Long commentId) {
-        return commentRepository.findById(commentId)
+    private Comment visibleComment(Long commentId) {
+        Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("评论不存在"));
+        if (!"VISIBLE".equals(comment.getStatus())) {
+            throw new IllegalArgumentException("评论不存在");
+        }
+        return comment;
     }
 
     private AppUser user(String username) {

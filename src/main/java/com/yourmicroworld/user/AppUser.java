@@ -11,6 +11,7 @@ public class AppUser {
     @Column(nullable = false, length = 32) private String username;
     @Column(nullable = false, length = 100) private String passwordHash;
     @Column(nullable = false, length = 20) private String role = "READER";
+    @Column(columnDefinition = "TEXT") private String bio;
     @Column(nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     protected AppUser() { }
@@ -19,5 +20,7 @@ public class AppUser {
     public String getUsername() { return username; }
     public String getPasswordHash() { return passwordHash; }
     public String getRole() { return role; }
+    public String getBio() { return bio; }
     public Instant getCreatedAt() { return createdAt; }
+    public void setBio(String bio) { this.bio = bio; }
 }

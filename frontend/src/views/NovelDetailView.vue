@@ -1,7 +1,17 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { addChapter, createComment, getChapterComments, getNovel, toggleCommentLike } from '../api'
+import {
+  addChapter,
+  createComment,
+  deleteComment,
+  deleteNovel,
+  getChapterComments,
+  getNovel,
+  toggleCommentLike,
+  updateNovel
+} from '../api'
+import { NOVEL_CATEGORIES } from '../constants/novelCategories'
 import TopNav from '../components/TopNav.vue'
 import ParagraphCommentPanel from '../components/ParagraphCommentPanel.vue'
 
@@ -10,7 +20,21 @@ const router = useRouter()
 const novel = ref(null)
 const error = ref('')
 const publishing = ref(false)
+const savingEdit = ref(false)
+const deletingNovel = ref(false)
+const editingNovel = ref(false)
 const form = reactive({ title: '', content: '' })
+const editForm = reactive({
+  title: '',
+  description: '',
+  category: '奇幻',
+  tagInput: '',
+  microContent: '',
+  worldSetting: '',
+  outlineContent: '',
+  allowIfBranch: true,
+  allowBid: true
+})
 const user = ref(JSON.parse(localStorage.getItem('microworld-user') || 'null'))
 const hasToken = computed(() => Boolean(localStorage.getItem('microworld-token')))
 const comments = ref([])
@@ -32,6 +56,26 @@ const activeComments = computed(() =>
     ? []
     : comments.value.filter((item) => item.paragraphIndex === activeParagraphIndex.value)
 )
+const parsedEditTags = computed(() =>
+  editForm.tagInput
+    .split(/[，,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+)
+
+function syncEditForm() {
+  if (!novel.value) return
+  editForm.title = novel.value.title || ''
+  editForm.description = novel.value.description || ''
+  editForm.category = novel.value.category || '奇幻'
+  editForm.tagInput = (novel.value.tags || []).join('，')
+  editForm.microContent = novel.value.microContent || ''
+  editForm.worldSetting = novel.value.worldSetting || ''
+  editForm.outlineContent = novel.value.outlineContent || ''
+  editForm.allowIfBranch = Boolean(novel.value.allowIfBranch)
+  editForm.allowBid = Boolean(novel.value.allowBid)
+}
 
 function commentsOf(index) {
   return comments.value.filter((item) => item.paragraphIndex === index)
@@ -41,6 +85,7 @@ async function load() {
   try {
     error.value = ''
     novel.value = await getNovel(props.id)
+    syncEditForm()
     comments.value = []
     activeParagraphIndex.value = null
 
@@ -52,15 +97,22 @@ async function load() {
   }
 }
 
+async function refreshMicroComments() {
+  if (novel.value?.type === 'MICRO' && novel.value?.microChapterId) {
+    comments.value = await getChapterComments(novel.value.microChapterId)
+  }
+}
+
 async function ensureMicroChapterId() {
   if (novel.value?.microChapterId) return novel.value.microChapterId
 
   const refreshed = await getNovel(props.id)
   novel.value = refreshed
+  syncEditForm()
 
   if (refreshed?.microChapterId) return refreshed.microChapterId
 
-  throw new Error('微小说评论通道还没有就绪。请重启后端后再试一次。')
+  throw new Error('微小说评论通道还没有就绪，请稍后再试。')
 }
 
 async function submitChapter() {
@@ -73,6 +125,46 @@ async function submitChapter() {
     error.value = e.message
   } finally {
     publishing.value = false
+  }
+}
+
+async function saveNovelEdit() {
+  savingEdit.value = true
+  error.value = ''
+  try {
+    novel.value = await updateNovel(props.id, {
+      title: editForm.title,
+      description: editForm.description,
+      category: editForm.category,
+      tags: parsedEditTags.value,
+      microContent: editForm.microContent,
+      worldSetting: editForm.worldSetting,
+      outlineContent: editForm.outlineContent,
+      allowIfBranch: editForm.allowIfBranch,
+      allowBid: editForm.allowBid
+    })
+    syncEditForm()
+    editingNovel.value = false
+    await refreshMicroComments()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+async function handleDeleteNovel() {
+  if (!window.confirm('确认删除这部小说吗？删除后书库中将不再显示。')) return
+
+  deletingNovel.value = true
+  error.value = ''
+  try {
+    await deleteNovel(props.id)
+    router.push('/published')
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    deletingNovel.value = false
   }
 }
 
@@ -114,6 +206,18 @@ async function handleToggleLike(commentId) {
   }
 }
 
+async function handleDeleteComment(commentId) {
+  if (!window.confirm('确认删除这条评论吗？')) return
+
+  try {
+    error.value = ''
+    await deleteComment(commentId)
+    await refreshMicroComments()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 function toggleParagraph(index) {
   activeParagraphIndex.value = activeParagraphIndex.value === index ? null : index
 }
@@ -143,6 +247,77 @@ onMounted(load)
           <span v-if="novel.category" class="tag-chip category-chip">{{ novel.category }}</span>
           <span v-for="tag in novel.tags" :key="tag" class="tag-chip">{{ tag }}</span>
         </div>
+
+        <div v-if="owner" class="owner-action-bar">
+          <button class="filter-chip" @click="editingNovel = !editingNovel">
+            {{ editingNovel ? '收起编辑' : '编辑小说信息' }}
+          </button>
+          <button class="filter-chip danger-chip" :disabled="deletingNovel" @click="handleDeleteNovel">
+            {{ deletingNovel ? '删除中…' : '删除小说' }}
+          </button>
+        </div>
+
+        <form v-if="owner && editingNovel" class="owner-edit-panel cute-panel" @submit.prevent="saveNovelEdit">
+          <div class="owner-edit-grid">
+            <label>
+              小说标题
+              <input v-model.trim="editForm.title" required maxlength="200" />
+            </label>
+
+            <label>
+              小说分类
+              <select v-model="editForm.category" required>
+                <option v-for="category in NOVEL_CATEGORIES" :key="category" :value="category">
+                  {{ category }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            简介
+            <textarea v-model.trim="editForm.description" maxlength="5000"></textarea>
+          </label>
+
+          <label>
+            小说标签
+            <input v-model.trim="editForm.tagInput" maxlength="120" placeholder="例如：校园，奇幻，成长（最多 5 个）" />
+          </label>
+
+          <div v-if="parsedEditTags.length" class="tag-preview">
+            <span v-for="tag in parsedEditTags" :key="tag" class="tag-chip">{{ tag }}</span>
+          </div>
+
+          <template v-if="isMicro">
+            <label>
+              微小说正文
+              <textarea v-model="editForm.microContent" class="story-input" required maxlength="100000"></textarea>
+            </label>
+          </template>
+
+          <template v-else>
+            <label>
+              世界观
+              <textarea v-model.trim="editForm.worldSetting" maxlength="20000"></textarea>
+            </label>
+
+            <label>
+              故事大纲
+              <textarea v-model.trim="editForm.outlineContent" maxlength="20000"></textarea>
+            </label>
+
+            <div class="checks">
+              <label><input v-model="editForm.allowIfBranch" type="checkbox" /> 允许 IF 分支</label>
+              <label><input v-model="editForm.allowBid" type="checkbox" /> 允许主线竞标</label>
+            </div>
+          </template>
+
+          <div class="owner-action-bar end">
+            <button class="primary cute-primary" :disabled="savingEdit">
+              {{ savingEdit ? '保存中…' : '保存修改' }}
+            </button>
+          </div>
+        </form>
 
         <details v-if="novel.worldSetting || novel.outlineContent" class="meta cute-meta">
           <summary>世界设定 / 大纲</summary>
@@ -194,6 +369,7 @@ onMounted(load)
                 :liking-comment-ids="likingCommentIds"
                 @submit-comment="handleSubmitMicroComment"
                 @toggle-like="handleToggleLike"
+                @delete-comment="handleDeleteComment"
               />
             </aside>
           </div>

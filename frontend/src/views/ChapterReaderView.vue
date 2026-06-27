@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createComment, getChapter, getChapterComments, getNovel, toggleCommentLike } from '../api'
+import { createComment, deleteComment, getChapter, getChapterComments, getNovel, toggleCommentLike, updateChapter } from '../api'
 import TopNav from '../components/TopNav.vue'
 import AnimatedBook from '../components/AnimatedBook.vue'
 import ParagraphCommentPanel from '../components/ParagraphCommentPanel.vue'
@@ -18,7 +18,11 @@ const readingProgress = ref(0)
 const activeParagraphIndex = ref(null)
 const submittingParagraph = ref(null)
 const likingCommentIds = ref([])
+const editingChapter = ref(false)
+const savingChapter = ref(false)
+const editForm = reactive({ title: '', content: '' })
 
+const owner = computed(() => user.value?.userId === chapter.value?.authorId)
 const paragraphs = computed(() =>
   chapter.value ? chapter.value.content.split(/\n\s*\n|\r?\n/).map((item) => item.trim()).filter(Boolean) : []
 )
@@ -50,6 +54,11 @@ const activeComments = computed(() =>
     : comments.value.filter((item) => item.paragraphIndex === activeParagraphIndex.value)
 )
 
+function syncEditForm() {
+  editForm.title = chapter.value?.title || ''
+  editForm.content = chapter.value?.content || ''
+}
+
 function commentsOf(index) {
   return comments.value.filter((item) => item.paragraphIndex === index)
 }
@@ -61,11 +70,13 @@ async function load() {
   comments.value = []
   activeParagraphIndex.value = null
   readingProgress.value = 0
+  editingChapter.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
 
   try {
     const currentChapter = await getChapter(props.id)
     chapter.value = currentChapter
+    syncEditForm()
     const [novelDetail, chapterComments] = await Promise.all([
       getNovel(currentChapter.novelId),
       getChapterComments(currentChapter.id)
@@ -76,6 +87,11 @@ async function load() {
   } catch (e) {
     error.value = e.message
   }
+}
+
+async function refreshComments() {
+  if (!chapter.value) return
+  comments.value = await getChapterComments(chapter.value.id)
 }
 
 function openChapter(chapterId) {
@@ -121,6 +137,43 @@ async function handleToggleLike(commentId) {
     error.value = e.message
   } finally {
     likingCommentIds.value = likingCommentIds.value.filter((id) => id !== commentId)
+  }
+}
+
+async function handleDeleteComment(commentId) {
+  if (!window.confirm('确认删除这条评论吗？')) return
+
+  try {
+    error.value = ''
+    await deleteComment(commentId)
+    await refreshComments()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
+async function saveChapterEdit() {
+  savingChapter.value = true
+  try {
+    error.value = ''
+    const updated = await updateChapter(props.id, {
+      title: editForm.title,
+      content: editForm.content
+    })
+    chapter.value = updated
+    editingChapter.value = false
+    syncEditForm()
+    if (novel.value?.chapters?.length) {
+      novel.value = {
+        ...novel.value,
+        chapters: novel.value.chapters.map((item) => (item.id === updated.id ? { ...item, title: updated.title } : item))
+      }
+    }
+    updateProgress()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    savingChapter.value = false
   }
 }
 
@@ -198,6 +251,30 @@ watch(() => props.id, load)
             <AnimatedBook />
           </div>
 
+          <div v-if="owner" class="owner-action-bar">
+            <button class="filter-chip" @click="editingChapter = !editingChapter">
+              {{ editingChapter ? '收起编辑' : '编辑本章' }}
+            </button>
+          </div>
+
+          <form v-if="owner && editingChapter" class="owner-edit-panel cute-panel" @submit.prevent="saveChapterEdit">
+            <label>
+              章节标题
+              <input v-model.trim="editForm.title" required maxlength="200" />
+            </label>
+
+            <label>
+              章节正文
+              <textarea v-model="editForm.content" class="story-input" required maxlength="100000"></textarea>
+            </label>
+
+            <div class="owner-action-bar end">
+              <button class="primary cute-primary" :disabled="savingChapter">
+                {{ savingChapter ? '保存中…' : '保存章节修改' }}
+              </button>
+            </div>
+          </form>
+
           <div class="content">
             <section
               v-for="(paragraph, index) in paragraphs"
@@ -237,6 +314,7 @@ watch(() => props.id, load)
             :liking-comment-ids="likingCommentIds"
             @submit-comment="handleSubmitComment"
             @toggle-like="handleToggleLike"
+            @delete-comment="handleDeleteComment"
           />
         </aside>
       </section>

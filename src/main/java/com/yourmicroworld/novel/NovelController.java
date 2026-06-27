@@ -44,6 +44,17 @@ public class NovelController {
         return ApiResponse.ok(service.detail(id));
     }
 
+    @PatchMapping("/{id:\\d+}")
+    public ApiResponse<NovelDetail> update(@PathVariable Long id, Authentication auth, @Valid @RequestBody NovelUpdateRequest request) {
+        return ApiResponse.ok(service.update(id, auth.getName(), request), "小说信息已更新");
+    }
+
+    @DeleteMapping("/{id:\\d+}")
+    public ApiResponse<Void> delete(@PathVariable Long id, Authentication auth) {
+        service.delete(id, auth.getName());
+        return ApiResponse.ok(null, "小说已删除");
+    }
+
     @GetMapping("/{id:\\d+}/chapters")
     public ApiResponse<List<ChapterResponse>> chapters(@PathVariable Long id) {
         return ApiResponse.ok(service.chapters(id));

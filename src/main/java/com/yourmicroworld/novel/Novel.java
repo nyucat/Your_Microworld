@@ -1,8 +1,8 @@
 package com.yourmicroworld.novel;
 
+import com.yourmicroworld.tag.Tag;
 import com.yourmicroworld.user.AppUser;
 import jakarta.persistence.*;
-import com.yourmicroworld.tag.Tag;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -64,7 +64,8 @@ public class Novel {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    protected Novel() {}
+    protected Novel() {
+    }
 
     public Novel(
             String title,
@@ -109,4 +110,28 @@ public class Novel {
     public boolean isAllowBid() { return allowBid; }
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+
+    public void updateBasics(
+            String title,
+            String description,
+            String category,
+            String microContent,
+            String worldSetting,
+            String outlineContent,
+            boolean allowIfBranch,
+            boolean allowBid
+    ) {
+        this.title = title;
+        this.description = description;
+        this.category = category;
+        this.microContent = microContent;
+        this.worldSetting = worldSetting;
+        this.outlineContent = outlineContent;
+        this.allowIfBranch = allowIfBranch;
+        this.allowBid = allowBid;
+    }
+
+    public void markDeleted() {
+        this.status = "DELETED";
+    }
 }

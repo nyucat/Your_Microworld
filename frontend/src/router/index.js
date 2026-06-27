@@ -5,6 +5,7 @@ import CreateNovelView from '../views/CreateNovelView.vue'
 import NovelDetailView from '../views/NovelDetailView.vue'
 import ChapterReaderView from '../views/ChapterReaderView.vue'
 import UserProfileView from '../views/UserProfileView.vue'
+import AuthorInboxView from '../views/AuthorInboxView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: '/novels/create', component: CreateNovelView, meta: { requiresAuth: true } },
     { path: '/novels/:id', component: NovelDetailView, props: true },
     { path: '/chapters/:id', component: ChapterReaderView, props: true },
+    { path: '/users/:id/inbox', component: AuthorInboxView, props: true, meta: { requiresAuth: true } },
     { path: '/users/:id', component: UserProfileView, props: true },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]

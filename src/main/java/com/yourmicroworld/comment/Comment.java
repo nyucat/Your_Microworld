@@ -43,7 +43,11 @@ public class Comment {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    protected Comment() {}
+    @Column(name = "owner_read_at")
+    private Instant ownerReadAt;
+
+    protected Comment() {
+    }
 
     public Comment(Chapter chapter, int paragraphIndex, AppUser user, Comment parentComment, String content) {
         this.chapter = chapter;
@@ -67,6 +71,10 @@ public class Comment {
     public int getLikeCount() { return likeCount; }
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getOwnerReadAt() { return ownerReadAt; }
+
+    public void markOwnerRead() { ownerReadAt = Instant.now(); }
+    public void markOwnerUnread() { ownerReadAt = null; }
 
     public void increaseLikeCount() {
         likeCount += 1;
@@ -74,5 +82,9 @@ public class Comment {
 
     public void decreaseLikeCount() {
         likeCount = Math.max(0, likeCount - 1);
+    }
+
+    public void markDeleted() {
+        this.status = "DELETED";
     }
 }

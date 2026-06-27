@@ -9,8 +9,16 @@ public record UserProfileResponse(
         Long id,
         String username,
         String role,
+        String bio,
         Instant joinedAt,
+        Instant recentActiveAt,
         long publishedNovelCount,
+        long serialNovelCount,
+        long microNovelCount,
         long publishedChapterCount,
-        List<NovelSummary> recentNovels
+        long receivedCommentCount,
+        long receivedLikeCount,
+        List<NovelSummary> recentNovels,
+        List<NovelSummary> serialNovels,
+        List<NovelSummary> microNovels
 ) { }

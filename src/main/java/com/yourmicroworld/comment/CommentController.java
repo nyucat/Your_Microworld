@@ -39,4 +39,10 @@ public class CommentController {
                 "点赞状态已更新"
         );
     }
+
+    @DeleteMapping("/api/comments/{commentId}")
+    public ApiResponse<Void> delete(@PathVariable Long commentId, Authentication authentication) {
+        commentService.delete(commentId, authentication.getName());
+        return ApiResponse.ok(null, "评论已删除");
+    }
 }

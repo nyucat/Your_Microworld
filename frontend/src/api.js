@@ -49,12 +49,26 @@ export const getCategoryOverview = (category = '') =>
   request(`/novels/category-overview${category ? `?category=${encodeURIComponent(category)}` : ''}`)
 export const getNovel = (id) => request(`/novels/${id}`)
 export const createNovel = (payload) => request('/novels', { method: 'POST', body: JSON.stringify(payload) })
+export const updateNovel = (novelId, payload) =>
+  request(`/novels/${novelId}`, { method: 'PATCH', body: JSON.stringify(payload) })
+export const deleteNovel = (novelId) => request(`/novels/${novelId}`, { method: 'DELETE' })
 export const addChapter = (novelId, payload) => request(`/novels/${novelId}/chapters`, { method: 'POST', body: JSON.stringify(payload) })
 export const getChapter = (id) => request(`/chapters/${id}`)
+export const updateChapter = (chapterId, payload) =>
+  request(`/chapters/${chapterId}`, { method: 'PATCH', body: JSON.stringify(payload) })
 export const getChapterComments = (chapterId) => request(`/chapters/${chapterId}/comments`)
 export const createComment = (chapterId, payload) =>
   request(`/chapters/${chapterId}/comments`, { method: 'POST', body: JSON.stringify(payload) })
 export const toggleCommentLike = (commentId) =>
   request(`/comments/${commentId}/like`, { method: 'POST' })
+export const deleteComment = (commentId) =>
+  request(`/comments/${commentId}`, { method: 'DELETE' })
 export const getTags = () => request('/tags')
 export const getUserProfile = (id) => request(`/users/${id}`)
+export const updateMyProfile = (payload) =>
+  request('/users/me/profile', { method: 'PATCH', body: JSON.stringify(payload) })
+export const getMyInteractions = () => request('/users/me/interactions')
+export const updateInteractionReadState = (commentId, payload) =>
+  request(`/users/me/interactions/${commentId}/read-state`, { method: 'PATCH', body: JSON.stringify(payload) })
+export const markAllInteractionsRead = () =>
+  request('/users/me/interactions/read-all', { method: 'PATCH' })

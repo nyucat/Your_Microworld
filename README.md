@@ -16,6 +16,7 @@
 - 段落评论（折叠展开）
 - 小说标签展示
 - 分类页专题：分类筛选、热门标签区、真实统计卡片、专题插画背景、加载更多
+- 个人主页 2.0：简介编辑、作者统计、作品分区展示、作者消息中心
 
 ## 技术栈
 
@@ -29,7 +30,7 @@
 | --- | --- | --- |
 | Sprint 0 | 已完成 | 后端工程、MySQL 连接、统一返回结构、JWT 登录、前端初始化、路由、API 封装、登录注册、`/health` |
 | Sprint 1 | 已完成 | 小说发布、小说列表、小说详情、章节阅读、主线续写 |
-| Sprint 1 补充 | 已完成 | 个人主页、前端中文化、可爱风 UI、交互动效、固定阅读导航、阅读进度条、微小说 / 连载小说类型拆分 |
+| Sprint 1 补充 | 已完成 | 个人主页、前端中文化、可爱风 UI、交互动效、固定阅读导航、阅读进度条、微小说 / 连载小说类型拆分、个人主页 2.0 |
 | Sprint 2 | 已完成 | 段落评论、评论列表、小说标签、独立小说分类、分类页筛选、分类真实统计、加载更多、社区化阅读互动 |
 | Sprint 3+ | 未开始 | IF 分支、竞标续写、角色系统、分析图谱、热度排行等 |
 
@@ -94,6 +95,8 @@ Your_Microworld/
 08_align_users_role.sql
 09_novel_types.sql
 10_novel_category.sql
+11_user_profile.sql
+12_comment_owner_read.sql
 ```
 
 说明：
@@ -103,6 +106,8 @@ Your_Microworld/
 - `08_align_users_role.sql`：对齐旧版 `users.role` 字段
 - `09_novel_types.sql`：新增小说类型字段 `type` 与微小说正文 `micro_content`
 - `10_novel_category.sql`：新增独立小说分类字段 `category`
+- `11_user_profile.sql`：新增用户个人简介字段 `bio`
+- `12_comment_owner_read.sql`：为评论增加作者消息中心的已读状态字段 `owner_read_at`
 
 如果你已导入到 `08`，并且还没有支持“微小说 / 连载小说”字段，请继续导入：
 
@@ -179,6 +184,8 @@ Vite 会将 `/api` 代理到后端 `8080`。
 | GET | `/api/novels/category-overview` | 分类专题概览，可带 `category` 查询参数 |
 | POST | `/api/novels` | 发布小说 |
 | GET | `/api/novels/{id}` | 小说详情 |
+| PATCH | `/api/novels/{id}` | 编辑小说标题 / 标签 / 分类 / 简介 / 微小说正文等信息 |
+| DELETE | `/api/novels/{id}` | 删除自己的小说 |
 | GET | `/api/novels/{id}/chapters` | 连载章节列表 |
 | POST | `/api/novels/{id}/chapters` | 追加主线章节 |
 
@@ -187,10 +194,16 @@ Vite 会将 `/api` 代理到后端 `8080`。
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/chapters/{id}` | 单章阅读 |
+| PATCH | `/api/chapters/{id}` | 编辑章节标题与正文 |
 | GET | `/api/chapters/{id}/comments` | 获取章节段落评论 |
 | POST | `/api/chapters/{id}/comments` | 发表评论 |
+| DELETE | `/api/comments/{id}` | 删除评论（评论作者或作品作者） |
 | GET | `/api/tags` | 获取标签列表 |
 | GET | `/api/users/{id}` | 用户个人主页 |
+| GET | `/api/users/me/interactions` | 查看自己作品收到的评论与评论点赞人 |
+| PATCH | `/api/users/me/interactions/{commentId}/read-state` | 标记消息为已读 / 未读 |
+| PATCH | `/api/users/me/interactions/read-all` | 一键将收到的消息全部标记为已读 |
+| PATCH | `/api/users/me/profile` | 更新当前登录用户简介 |
 
 ## 发布小说请求示例
 

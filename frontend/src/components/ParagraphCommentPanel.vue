@@ -13,7 +13,7 @@ const props = defineProps({
   likingCommentIds: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['submit-comment', 'toggle-like'])
+const emit = defineEmits(['submit-comment', 'toggle-like', 'delete-comment'])
 
 const replyForms = reactive({})
 const replyTargetId = ref(null)
@@ -40,10 +40,8 @@ function formatRelativeTime(value) {
 
 function sortCommentItems(items) {
   return [...items].sort((a, b) => {
-    if (sortBy.value === 'hot') {
-      if ((b.likeCount || 0) !== (a.likeCount || 0)) {
-        return (b.likeCount || 0) - (a.likeCount || 0)
-      }
+    if (sortBy.value === 'hot' && (b.likeCount || 0) !== (a.likeCount || 0)) {
+      return (b.likeCount || 0) - (a.likeCount || 0)
     }
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
@@ -60,13 +58,13 @@ function rootCommentIdOf(comment) {
 const topLevelComments = computed(() =>
   sortCommentItems(
     props.comments
-    .filter((item) => item.parentCommentId == null)
-    .map((item) => ({
-      ...item,
-      replies: sortCommentItems(
-        props.comments.filter((reply) => reply.parentCommentId != null && rootCommentIdOf(reply) === item.id)
-      )
-    }))
+      .filter((item) => item.parentCommentId == null)
+      .map((item) => ({
+        ...item,
+        replies: sortCommentItems(
+          props.comments.filter((reply) => reply.parentCommentId != null && rootCommentIdOf(reply) === item.id)
+        )
+      }))
   )
 )
 
@@ -86,6 +84,10 @@ function floorOf(commentId) {
 
 function isAuthorComment(username) {
   return Boolean(props.authorName) && username === props.authorName
+}
+
+function canDelete(comment) {
+  return Boolean(props.user) && (props.user.userId === comment.userId || props.user.username === props.authorName)
 }
 
 function replyTargetNameOf(comment) {
@@ -125,6 +127,10 @@ function toggleLike(commentId) {
   emit('toggle-like', commentId)
 }
 
+function removeComment(commentId) {
+  emit('delete-comment', commentId)
+}
+
 watch(() => props.activeParagraphIndex, () => {
   replyTargetId.value = null
 })
@@ -139,7 +145,7 @@ watch(() => props.activeParagraphIndex, () => {
         当前查看第 {{ activeParagraphIndex + 1 }} 段
       </p>
       <p v-else class="reader-comment-subtitle">
-        点击正文末尾的聊天气泡，在这里展开评论。
+        点击正文末尾的聊天气泡，在这里展开对应段落的评论。
       </p>
     </div>
 
@@ -182,23 +188,20 @@ watch(() => props.activeParagraphIndex, () => {
                 <strong>{{ comment.likeCount }}</strong>
               </button>
 
-              <button
-                class="comment-action-button ghost"
-                :disabled="!hasToken"
-                @click="openReply(comment)"
-              >
+              <button class="comment-action-button ghost" :disabled="!hasToken" @click="openReply(comment)">
                 <span>↩</span>
                 <strong>回复</strong>
+              </button>
+
+              <button v-if="canDelete(comment)" class="comment-action-button ghost" @click="removeComment(comment.id)">
+                <span>✕</span>
+                <strong>删除</strong>
               </button>
             </div>
           </div>
 
           <div v-if="comment.replies.length" class="comment-reply-box">
-            <article
-              v-for="reply in comment.replies"
-              :key="reply.id"
-              class="comment-reply-item"
-            >
+            <article v-for="reply in comment.replies" :key="reply.id" class="comment-reply-item">
               <div class="comment-meta compact">
                 <div class="comment-meta-main">
                   <strong>{{ reply.username }}</strong>
@@ -224,13 +227,14 @@ watch(() => props.activeParagraphIndex, () => {
                   <strong>{{ reply.likeCount }}</strong>
                 </button>
 
-                <button
-                  class="comment-action-button ghost mini"
-                  :disabled="!hasToken"
-                  @click="openReply(reply)"
-                >
+                <button class="comment-action-button ghost mini" :disabled="!hasToken" @click="openReply(reply)">
                   <span>↩</span>
                   <strong>回复</strong>
+                </button>
+
+                <button v-if="canDelete(reply)" class="comment-action-button ghost mini" @click="removeComment(reply.id)">
+                  <span>✕</span>
+                  <strong>删除</strong>
                 </button>
               </div>
 
@@ -239,11 +243,7 @@ watch(() => props.activeParagraphIndex, () => {
                 class="comment-form nested-reply-form"
                 @submit.prevent="submitReply(reply)"
               >
-                <textarea
-                  v-model="replyForms[reply.id]"
-                  maxlength="5000"
-                  :placeholder="`回复 ${reply.username}……`"
-                ></textarea>
+                <textarea v-model="replyForms[reply.id]" maxlength="5000" :placeholder="`回复 ${reply.username}…`"></textarea>
                 <button class="cute-primary comment-submit" :disabled="submittingParagraph === activeParagraphIndex">
                   {{ submittingParagraph === activeParagraphIndex ? '发布中…' : '发布回复' }}
                 </button>
@@ -256,11 +256,7 @@ watch(() => props.activeParagraphIndex, () => {
             class="comment-form nested-reply-form"
             @submit.prevent="submitReply(comment)"
           >
-            <textarea
-              v-model="replyForms[comment.id]"
-              maxlength="5000"
-              :placeholder="`回复 ${comment.username}……`"
-            ></textarea>
+            <textarea v-model="replyForms[comment.id]" maxlength="5000" :placeholder="`回复 ${comment.username}…`"></textarea>
             <button class="cute-primary comment-submit" :disabled="submittingParagraph === activeParagraphIndex">
               {{ submittingParagraph === activeParagraphIndex ? '发布中…' : '发布回复' }}
             </button>
@@ -271,11 +267,7 @@ watch(() => props.activeParagraphIndex, () => {
       <div v-else class="comment-empty">这一段还没有评论，来留下第一条吧。</div>
 
       <form v-if="user && hasToken" class="comment-form reader-comment-form" @submit.prevent="submitMainComment">
-        <textarea
-          v-model="replyForms.main"
-          maxlength="5000"
-          placeholder="写下你的主评论……"
-        ></textarea>
+        <textarea v-model="replyForms.main" maxlength="5000" placeholder="写下你的主评论……"></textarea>
         <button class="cute-primary comment-submit" :disabled="submittingParagraph === activeParagraphIndex">
           {{ submittingParagraph === activeParagraphIndex ? '发布中…' : '发布评论' }}
         </button>
