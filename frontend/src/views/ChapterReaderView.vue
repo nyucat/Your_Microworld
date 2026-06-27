@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createComment, deleteComment, getChapter, getChapterComments, getNovel, toggleCommentLike, updateChapter } from '../api'
 import TopNav from '../components/TopNav.vue'
@@ -20,7 +20,18 @@ const submittingParagraph = ref(null)
 const likingCommentIds = ref([])
 const editingChapter = ref(false)
 const savingChapter = ref(false)
+const successMessage = ref('')
+let successTimer = null
+
 const editForm = reactive({ title: '', content: '' })
+const confirmState = reactive({
+  open: false,
+  title: '',
+  description: '',
+  confirmText: '确认',
+  loading: false,
+  onConfirm: null
+})
 
 const owner = computed(() => user.value?.userId === chapter.value?.authorId)
 const paragraphs = computed(() =>
@@ -53,6 +64,45 @@ const activeComments = computed(() =>
     ? []
     : comments.value.filter((item) => item.paragraphIndex === activeParagraphIndex.value)
 )
+
+function showSuccess(message) {
+  successMessage.value = message
+  if (successTimer) clearTimeout(successTimer)
+  successTimer = setTimeout(() => {
+    successMessage.value = ''
+    successTimer = null
+  }, 2400)
+}
+
+function openConfirm({ title, description, confirmText = '确认', onConfirm }) {
+  confirmState.open = true
+  confirmState.title = title
+  confirmState.description = description
+  confirmState.confirmText = confirmText
+  confirmState.loading = false
+  confirmState.onConfirm = onConfirm
+}
+
+function closeConfirm() {
+  if (confirmState.loading) return
+  confirmState.open = false
+  confirmState.title = ''
+  confirmState.description = ''
+  confirmState.confirmText = '确认'
+  confirmState.onConfirm = null
+}
+
+async function confirmAction() {
+  if (!confirmState.onConfirm || confirmState.loading) return
+  confirmState.loading = true
+  try {
+    await confirmState.onConfirm()
+    closeConfirm()
+  } catch (e) {
+    error.value = e.message
+    confirmState.loading = false
+  }
+}
 
 function syncEditForm() {
   editForm.title = chapter.value?.title || ''
@@ -140,16 +190,18 @@ async function handleToggleLike(commentId) {
   }
 }
 
-async function handleDeleteComment(commentId) {
-  if (!window.confirm('确认删除这条评论吗？')) return
-
-  try {
-    error.value = ''
-    await deleteComment(commentId)
-    await refreshComments()
-  } catch (e) {
-    error.value = e.message
-  }
+function handleDeleteComment(commentId) {
+  openConfirm({
+    title: '删除这条评论？',
+    description: '删除后这条评论将不再展示在当前段落讨论中。',
+    confirmText: '删除评论',
+    onConfirm: async () => {
+      error.value = ''
+      await deleteComment(commentId)
+      await refreshComments()
+      showSuccess('评论已删除')
+    }
+  })
 }
 
 async function saveChapterEdit() {
@@ -169,6 +221,7 @@ async function saveChapterEdit() {
         chapters: novel.value.chapters.map((item) => (item.id === updated.id ? { ...item, title: updated.title } : item))
       }
     }
+    showSuccess('章节保存成功')
     updateProgress()
   } catch (e) {
     error.value = e.message
@@ -194,6 +247,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', updateProgress)
   window.removeEventListener('resize', updateProgress)
+})
+
+onBeforeUnmount(() => {
+  if (successTimer) clearTimeout(successTimer)
 })
 
 watch(() => props.id, load)
@@ -331,5 +388,32 @@ watch(() => props.id, load)
     </template>
 
     <p v-else class="empty-state cute-empty">{{ error || '正在打开章节…' }}</p>
+
+    <Transition name="toast-pop">
+      <div v-if="successMessage" class="success-toast">
+        <span class="success-icon">✓</span>
+        <div>
+          <strong>保存成功</strong>
+          <p>{{ successMessage }}</p>
+        </div>
+        <span class="success-heart">♡</span>
+      </div>
+    </Transition>
+
+    <Transition name="comment-fold">
+      <div v-if="confirmState.open" class="cute-confirm-backdrop" @click.self="closeConfirm">
+        <div class="cute-confirm-dialog cute-panel">
+          <p class="eyebrow">CONFIRM ACTION</p>
+          <h3>{{ confirmState.title }}</h3>
+          <p>{{ confirmState.description }}</p>
+          <div class="cute-confirm-actions">
+            <button class="filter-chip" type="button" @click="closeConfirm">先想想</button>
+            <button class="primary cute-primary" type="button" :disabled="confirmState.loading" @click="confirmAction">
+              {{ confirmState.loading ? '处理中…' : confirmState.confirmText }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </main>
 </template>
